@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Profile 1": {
+      "commandName": "Executable",
+      "executablePath": "D:\\application\\autodesk\\AutoCAD 2025\\acad.exe",
+      "commandLineArgs": "/b D:\\project_mau_autocad\\cmd_autocad_net\\project_drawing_object\\project_drawing_object\\bin\\Debug\\net8.0-windows\\Loadproject_drawing_object.scr"
+    }
+  }
+}

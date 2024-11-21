@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="chcp 65001&#xD;&#xA; echo NETLOAD $(TargetPath)&gt; $(TargetDir)Load$(ProjectName).scr" />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="accoremgd">
+      <HintPath>D:\application\autodesk\AutoCAD 2025\accoremgd.dll</HintPath>
+    </Reference>
+    <Reference Include="Acdbmgd">
+      <HintPath>D:\application\autodesk\AutoCAD 2025\acdbmgd.dll</HintPath>
+    </Reference>
+    <Reference Include="Acmgd">
+      <HintPath>D:\application\autodesk\AutoCAD 2025\acmgd.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
