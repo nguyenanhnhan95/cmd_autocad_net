@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Autodesk.AutoCAD.EditorInput;
+using project_drawing_object.config;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +17,10 @@ namespace project_drawing_object.utils
                 return true;
             }
             return false;
+        }
+        public static void NotificationMessage(string message) { 
+            Editor ed = ConnectDrawing.DocumentAutoCad.Editor;
+            ed.WriteMessage(message);   
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Autodesk.AutoCAD.DatabaseServices;
+﻿using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using project_drawing_object.config;
@@ -33,7 +34,7 @@ namespace project_drawing_object.jig
             dynamicAngularConfig.addToDynamicCollection(dimensionCollection);
             dynamicDimensionConfig.addToDynamicCollection(dimensionCollection);
         }
-
+        public LineJig() : base(new Line()) { }
         protected override SamplerStatus Sampler(JigPrompts prompts)
         {
             if (Entity is not Line line) return SamplerStatus.NoChange;
@@ -56,9 +57,10 @@ namespace project_drawing_object.jig
                 case PromptStatus.Other:
                     this.mEndPoint = res.Value;
                     return SamplerStatus.OK;
+                case PromptStatus.None:
+                    return SamplerStatus.NoChange;
                 case PromptStatus.Cancel:
                     return SamplerStatus.Cancel;
-
                 default:
                     return SamplerStatus.OK;
             }
@@ -77,15 +79,13 @@ namespace project_drawing_object.jig
             }
             else
             {
-                jigOpts.Keywords.Add("Undo");
                 jigOpts.Keywords.Add("Close");
+                jigOpts.Keywords.Add("Undo");
             }
-
             jigOpts.BasePoint = mStartPoint;
             jigOpts.UseBasePoint = true;
-            jigOpts.UserInputControls = UserInputControls.Accept3dCoordinates |
-                                         UserInputControls.NoZeroResponseAccepted |
-                                         UserInputControls.NoNegativeResponseAccepted;
+            jigOpts.UserInputControls = UserInputControls.AcceptOtherInputString | UserInputControls.GovernedByUCSDetect |
+                UserInputControls.Accept3dCoordinates | UserInputControls.NoNegativeResponseAccepted | UserInputControls.NoZDirectionOrtho;
 
             return jigOpts;
         }
@@ -97,89 +97,133 @@ namespace project_drawing_object.jig
                 this.angle = (this.mEndPoint - this.mStartPoint).AngleOnPlane(plane);
                 this.length = (this.mEndPoint - this.mStartPoint).Length;
                 line.EndPoint = this.mEndPoint;
-                dynamicDimensionConfig.UpdateLineDimension(line);
-                dynamicAngularConfig.UpdateAngleDimension(line,length,angle);
+                dynamicDimensionConfig.UpdateLineDimension(line.StartPoint, line.EndPoint);
+                dynamicAngularConfig.UpdateAngleDimension(line, length, angle);
                 return true;
             }
             return false;
         }
-        static public void DoDrawingLine()
+        public  void DoDrawingLine()
         {
             var doc = ConnectDrawing.DocumentAutoCad;
             Editor ed = doc.Editor;
-            PromptPointOptions ppoStart = new("\nSpecify first point ");
+            PromptPointOptions ppoStart = CreateFristPromptOptions();
             PromptPointResult pprResult = ed.GetPoint(ppoStart);
             if (pprResult.Status == PromptStatus.Cancel)
             {
                 return;
             }
-            if (pprResult.Status == PromptStatus.OK)
+            switch (pprResult.Status)
             {
-                Vector3d normal = Vector3d.ZAxis;
-                List<Entity> drawnLines = [];
-                LineJig lineJig = new(pprResult.Value, normal, drawnLines);
-                PromptResult dynamicPoint = ed.Drag(lineJig);
-                bool statusContinue = true;
-                while (statusContinue)
-                {
-                    using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                case PromptStatus.OK:
+                    if (pprResult.Status == PromptStatus.OK)
                     {
-                        try
-                        {
-                            BlockTable bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
-                            BlockTableRecord btr = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForWrite);
-                            switch (dynamicPoint.Status)
-                            {
-                                case PromptStatus.OK:
-                                    btr.AppendEntity(lineJig.GetEntity());
-                                    tr.AddNewlyCreatedDBObject(lineJig.GetEntity(), true);
-                                    tr.Commit();
-                                    lineJig.drawnLines.Add(lineJig.GetEntity());
-                                    lineJig = new LineJig(lineJig.mEndPoint, normal, lineJig.drawnLines);
-                                    dynamicPoint = ed.Drag(lineJig);
-                                    break;
-                                case PromptStatus.Cancel:
-                                    statusContinue = false;
-                                    break;
-                                case PromptStatus.Keyword:
-                                    HandleKeyword(ref dynamicPoint, ref lineJig, ref statusContinue, tr, btr, ed);
-                                    break;
-                                case PromptStatus.Other:
-                                    if (lineJig.GetEntity() is Line line)
-                                    {
-                                        line.EndPoint = lineJig.mEndPoint;
-                                    }
-                                    btr.AppendEntity(lineJig.GetEntity());
-                                    tr.AddNewlyCreatedDBObject(lineJig.GetEntity(), true);
-                                    tr.Commit();
-                                    lineJig.drawnLines.Add(lineJig.GetEntity());
-                                    lineJig = new LineJig(lineJig.mEndPoint, normal, lineJig.drawnLines);
-                                    dynamicPoint = ed.Drag(lineJig);
-                                    break;
-                                default:
-                                    statusContinue = false;
-                                    break;
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            ed.WriteMessage("Error {0}", e.Message);
-                            tr.Abort();
-                            break;
-                        }
+                        Vector3d normal = Vector3d.ZAxis;
+                        List<Entity> drawnLines = [];
+                        LineJig lineJig = new(pprResult.Value, normal, drawnLines);
+                        PromptResult dynamicPoint = ed.Drag(lineJig);
+                        HandleDynamic(dynamicPoint, doc, ed, lineJig, normal);
                     }
-                }
-
+                    break;
+                case PromptStatus.None:
+                    var lastPointValue = Application.GetSystemVariable("LASTPOINT");
+                    if (lastPointValue is Point3d pointLast)
+                    {
+                        Vector3d normal = Vector3d.ZAxis;
+                        var drawnLines = new List<Entity>();
+                        LineJig lineJig = new(pointLast, normal, drawnLines);
+                        PromptResult dynamicPoint = ed.Drag(lineJig);
+                        HandleDynamic(dynamicPoint, doc, ed, lineJig, normal);
+                    }
+                    else
+                    {
+                        CommonUtils.NotificationMessage("\nNo line or arc to continue.");
+                        DoDrawingLine();
+                    }
+                    break;
+                case PromptStatus.Keyword:
+                    CommonUtils.NotificationMessage("Invalid point.");
+                    DoDrawingLine();
+                    break;
+                default:
+                    break;
             }
-
+  
+           
         }
-
-
         private Entity GetEntity()
         {
             return Entity;
         }
-        private static void HandleKeyword(ref PromptResult dynamicPoint, ref LineJig lineJig, ref bool statusContinue, Transaction tr, BlockTableRecord btr, Editor ed)
+        private static PromptPointOptions CreateFristPromptOptions()
+        {
+            PromptPointOptions ppoStart = new("\nSpecify first point ");
+            ppoStart.AppendKeywordsToMessage = true;
+            ppoStart.AllowArbitraryInput = true;
+            ppoStart.AllowNone = true;
+            ppoStart.UseBasePoint = false;
+            ppoStart.UseDashedLine = false;
+            return ppoStart;
+        }
+        private void HandleDynamic(PromptResult dynamicPoint, Document doc, Editor ed, LineJig lineJig, Vector3d normal)
+        {
+            bool statusContinue = true;
+            while (statusContinue)
+            {
+                using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+                {
+                    try
+                    {
+                        BlockTable bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+
+                        BlockTableRecord btr = (BlockTableRecord)tr.GetObject(doc.Database.CurrentSpaceId, OpenMode.ForWrite);
+                        switch (dynamicPoint.Status)
+                        {
+                            case PromptStatus.OK:
+                                btr.AppendEntity(lineJig.GetEntity());
+                                tr.AddNewlyCreatedDBObject(lineJig.GetEntity(), true);
+                                tr.Commit();
+                                lineJig.drawnLines.Add(lineJig.GetEntity());
+                                lineJig = new LineJig(lineJig.mEndPoint, normal, lineJig.drawnLines);
+                                dynamicPoint = ed.Drag(lineJig);
+                                break;
+                            case PromptStatus.Cancel:
+                                statusContinue = false;
+                                break;
+                            case PromptStatus.Keyword:
+                                HandleKeyword(ref dynamicPoint, ref lineJig, ref statusContinue, tr, btr, ed);
+                                break;
+                            case PromptStatus.Other:
+                                //if (lineJig.GetEntity() is Line line)
+                                //{
+                                //    line.EndPoint = lineJig.mEndPoint;
+                                //}
+                                //btr.AppendEntity(lineJig.GetEntity());
+                                //tr.AddNewlyCreatedDBObject(lineJig.GetEntity(), true);
+                                //tr.Commit();
+                                //lineJig.drawnLines.Add(lineJig.GetEntity());
+                                //lineJig = new LineJig(lineJig.mEndPoint, normal, lineJig.drawnLines);
+                                //dynamicPoint = ed.Drag(lineJig);
+                                statusContinue = false;
+                                break;
+                            case PromptStatus.None:
+                                statusContinue = false;
+                                break;
+                            default:
+                                statusContinue = false;
+                                break;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        ed.WriteMessage("Error {0}", e.Message);
+                        tr.Abort();
+                        break;
+                    }
+                }
+            }
+        }
+        private  void HandleKeyword(ref PromptResult dynamicPoint, ref LineJig lineJig, ref bool statusContinue, Transaction tr, BlockTableRecord btr, Editor ed)
         {
             if (lineJig == null)
             {
@@ -224,7 +268,8 @@ namespace project_drawing_object.jig
                     break;
             }
         }
-        
+
+
 
         protected override DynamicDimensionDataCollection GetDynamicDimensionData(double dimScale)
         {

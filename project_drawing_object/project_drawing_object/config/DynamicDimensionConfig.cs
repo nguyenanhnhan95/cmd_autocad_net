@@ -28,18 +28,18 @@ namespace project_drawing_object.config
             dynamicDimension.Focal = true;
             dimensionCollection.Add(dynamicDimension);
         }
-        public void UpdateLineDimension(Line line)
+        public void UpdateLineDimension(Point3d StartPoint, Point3d EndPoint)
         {
-            this.alignedDimension.XLine1Point = line.StartPoint;
-            this.alignedDimension.XLine2Point = line.EndPoint;
+            this.alignedDimension.XLine1Point = StartPoint;
+            this.alignedDimension.XLine2Point = EndPoint;
             
-            if (line.StartPoint.Y > line.EndPoint.Y)
+            if (StartPoint.Y > EndPoint.Y)
             {
-                this.alignedDimension.DimLinePoint = line.EndPoint.RotateBy(-Math.PI / 30, Vector3d.ZAxis, line.StartPoint);
+                this.alignedDimension.DimLinePoint = EndPoint.RotateBy(-Math.PI / 30, Vector3d.ZAxis, StartPoint);
             }
             else
             {
-                this.alignedDimension.DimLinePoint = line.EndPoint.RotateBy(+Math.PI / 30, Vector3d.ZAxis, line.StartPoint);
+                this.alignedDimension.DimLinePoint = EndPoint.RotateBy(+Math.PI / 30, Vector3d.ZAxis, StartPoint);
             }
         }
         public AlignedDimension GetAlignedDimension()

@@ -10,17 +10,17 @@ using project_drawing_object.utils;
 
 
 [assembly: Autodesk.AutoCAD.Runtime.ExtensionApplication(null)]
-[assembly: CommandClass(typeof(project_drawing_object.vm.LineDrawing))]
+[assembly: CommandClass(typeof(project_drawing_object.vm.LineVM))]
 namespace project_drawing_object.vm
 {
-    public class LineDrawing
+    public class LineVM
     {
 
         [CommandMethod("Dline")]
         public static void DrawingLine()
         {
-        
-            LineJig.DoDrawingLine();
+            LineJig lineJig = new LineJig();
+            lineJig.DoDrawingLine();
         }
         
     } 

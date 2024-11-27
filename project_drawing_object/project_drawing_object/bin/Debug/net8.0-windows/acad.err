@@ -1,6 +1,7 @@
 
 
-FATAL ERROR:  Unhandled Access Violation Reading 0x0f8c Exception at 3163143Ah
+INTERNAL ERROR:  !dbobji.cpp@8703: eNotOpenForWrite
 
-11/19/2024 at 16:01:24.000  Drawing: 
+11/25/2024 at 16:19:14.000  Drawing: Drawing1.dwg
+-------------
 -------------
